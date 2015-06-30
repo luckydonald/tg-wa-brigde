@@ -12,7 +12,9 @@ from yowsup.stacks import YowStack
 from yowsup.common import YowConstants
 from yowsup.layers import YowLayerEvent, YowParallelLayer
 from yowsup import env
-from pytg2 import Telegram
+from pytg import cli
+from pytg.interfaces import automatic
+from pytg.sender import Sender
 
 import config_reader  # force execution
 from config_reader import config
@@ -38,10 +40,17 @@ if __name__==  "__main__":
 			YowNetworkLayer
 		)
 
-
-	tg = Telegram(telegram=config["tg-cli-path"], pubkey_file=config["tg-cli-pubkey"])
+	HOST = config["tg-cli-host"]
+	PORT = config["tg-cli-port"]
+	receiver=automatic.receiver.Receiver(host=HOST, port=PORT)
+	sender=Sender(host=HOST, port=PORT)
+	class TG(object): #quick and dirty.
+		receiver  = None
+		sender  = None
+	TG.sender = sender
+	TG.receiver = receiver
 	stack = YowStack(layers)
-	stack.setProp(EchoLayer.PROP_TELEGRAM, tg)
+	stack.setProp(EchoLayer.PROP_TELEGRAM, TG)
 	stack.getLayer(-1).start() #EchoLayer, the highest element.
 	stack.setProp(YowAuthenticationProtocolLayer.PROP_CREDENTIALS, CREDENTIALS)         #setting credentials
 	stack.setProp(YowNetworkLayer.PROP_ENDPOINT, YowConstants.ENDPOINTS[0])    #whatsapp server address
@@ -52,8 +61,11 @@ if __name__==  "__main__":
 	#receiver_thread = threading.Thread(target=stack.loop, args=()) #this is the program mainloop
 	#receiver_thread.daemon = True  # exit if script reaches end.
 	#receiver_thread.start()
-	tg.receiver.start()
+	receiver.start()
 	while 1:
 		stack.broadcastEvent(YowLayerEvent(YowNetworkLayer.EVENT_STATE_CONNECT))   #sending the connect signal
-		stack.loop() #this is the program mainloop
+		try:
+			stack.loop() #this is the program mainloop
+		except:
+			pass
 		logger.debug("exited loop, reconnecting.")

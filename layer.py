@@ -3,8 +3,7 @@ import tempfile
 import threading
 import utils #own file
 import logging
-from pytg2 import Telegram, NoResponse
-from pytg2.utils import coroutine
+from pytg.exceptions import NoResponse
 from yowsup.layers.protocol_media.mediauploader import MediaUploader
 from yowsup.layers.protocol_messages.protocolentities import TextMessageProtocolEntity
 from yowsup.layers.protocol_media.protocolentities import MediaMessageProtocolEntity, RequestUploadIqProtocolEntity, \
@@ -50,7 +49,8 @@ class EchoLayer(YowInterfaceLayer):
 	tg = None
 
 	def __init__(self):
-		super().__init__()
+		super(EchoLayer).__init__()
+		self.callbacks = {}
 		EchoLayer.instance = self
 		#print("All Loggers: %s" % str())
 
@@ -65,21 +65,20 @@ class EchoLayer(YowInterfaceLayer):
 		user_str = self.text_wa_to_str(incoming.getNotify())
 		tg_peer = wa_to_tg(wa_peer)
 
-		s = self.tg.sender
+		s = self.sender
 		receipt = OutgoingReceiptProtocolEntity(incoming.getId(), incoming.getFrom())
 		logger.debug(">>%s<<" % str(incoming))
-
-		msg = "<lol>"
+		msg = "<lol, fail>"
 
 
 		# MEDIA
 		if incoming.getType() == "media":
 			# MEDIA IMAGE
 			if incoming.getMediaType() == "image":  # ('audio', 'image', 'video', 'vcard', 'location')
-				url = incoming.getMediaUrl()  #todo DL
-				file = utils.download_file(url=url,temp_dir=tempdir)
+				url = incoming.getMediaUrl()
+				file = utils.download_file(url=url, temp_dir=tempdir)
 				try:
-					s.send_msg(tg_peer, "{user}: [photo]{caption}:".format(user=user_str, caption=(
+					s.send_photo(tg_peer, file, caption="{user}: {caption}:".format(user=user_str, caption=(
 						" \"%s\"" % self.text_wa_to_str(incoming.getCaption()).strip()) if incoming.getCaption() else ""))
 				except NoResponse:
 					pass
@@ -182,10 +181,10 @@ class EchoLayer(YowInterfaceLayer):
 	###################
 
 	def start_tg_routine(self):
-		self.tg.receiver.message(self.tg_messages())
+		self.tg.receiver.register_event_loop(self.tg_messages())
 
 	download_list = {}
-	@coroutine
+
 	def tg_messages(self):
 		try:
 			while 1:
@@ -196,9 +195,9 @@ class EchoLayer(YowInterfaceLayer):
 					if message.own:
 						continue
 					user_str, wa_peer = self.get_tg_meta_from_message(message)
-					# logger.debug("{user} ({tg_peer} > {wa_peer}): {msg}".format(user=user_str, tg_peer=tg_peer, wa_peer=wa_peer, msg=message))
+					logger.debug("{user} ({tg_peer} > {wa_peer}): {msg}".format(user=user_str, tg_peer=tg_peer, wa_peer=wa_peer, msg=message))
 					if "freshness" in message:
-						if not message.freshness in ['startup','new']: # 'startup' or 'new', not 'old'
+						if not message.freshness in ['startup', 'new']: # 'startup' or 'new', not 'old'
 							continue
 					if message.event == "message":
 						# TEXT #
@@ -223,6 +222,7 @@ class EchoLayer(YowInterfaceLayer):
 					if message.media.type=="photo":
 						txt = "{user}: [image]".format(user=user_str)
 						self.sendImage(message.file, wa_peer)
+						self.sendImage()
 					elif message.media.type == "document":
 						if message.media.document == "image":
 							self.sendImage(message.file, wa_peer)
@@ -234,7 +234,6 @@ class EchoLayer(YowInterfaceLayer):
 						txt = "{user}: [{type}]".format(user=user_str, type=message.media.type)
 					reply = TextMessageProtocolEntity(self.text_str_to_wa(txt), to=wa_peer)
 					self.toLower(reply)
-					#self.toLower(reply2)
 		except GeneratorExit:
 			logger.warn("GeneratorExit!")
 

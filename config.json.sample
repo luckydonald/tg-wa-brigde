@@ -5,6 +5,8 @@
   "wa-default-receiver":"49XXXXXXXXXX@s.whatsapp.net",
   "tg-cli-path":"/path/to/tg-for-pytg2/bin/telegram-cli",
   "tg-cli-pubkey":"/path/to/tg-for-pytg2/server.pub",
+  "tg-cli-host":"localhost",
+  "tg-cli-port":4458,
   "tg-default-receiver":"user#XXXXXXXX",
   "wa-to-tg-relation":{
     "user#XXXXXXXX": "49XXXXXXXXXX@s.whatsapp.net",
